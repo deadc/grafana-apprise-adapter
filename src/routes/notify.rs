@@ -1,4 +1,4 @@
-use actix_web::client::Client;
+use awc::Client;
 use actix_web::http::header;
 use actix_web::{web, HttpRequest, HttpResponse};
 
@@ -19,14 +19,13 @@ pub async fn notify(
         Err(_) => return HttpResponse::BadRequest().finish(),
     };
     let authorization_header = req.headers().get(header::AUTHORIZATION);
-    return match client
-        .post(apprise_url.as_str())
-        .if_some(authorization_header, |header, builder| {
-            builder.set_header(header::AUTHORIZATION, header.clone())
-        })
-        .send_json(&payload)
-        .await
-    {
+
+    let mut request = client.post(apprise_url.as_str());
+    if let Some(header) = authorization_header {
+        request = request.insert_header((header::AUTHORIZATION, header.clone()));
+    }
+
+    return match request.send_json(&payload).await {
         Ok(response) => HttpResponse::new(response.status()),
         Err(_) => HttpResponse::BadGateway().finish(),
     };

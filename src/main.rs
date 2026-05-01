@@ -26,7 +26,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .wrap(Logger::default())
-            .data(app_state.clone())
+            .app_data(web::Data::new(app_state.clone()))
             .route("/notify/{key}", web::post().to(routes::notify))
             .route("/health", web::get().to(routes::health))
     })

@@ -2,7 +2,7 @@ use serde::Serialize;
 use std::env;
 use url::{ParseError, Url};
 
-use crate::grafana::{GrafanaPayload, GrafanaState};
+use crate::grafana::{GrafanaPayload, GrafanaState, LegacyPayload, UnifiedPayload};
 
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
@@ -36,10 +36,51 @@ pub struct ApprisePayload {
 
 impl From<GrafanaPayload> for ApprisePayload {
     fn from(gf_payload: GrafanaPayload) -> ApprisePayload {
+        match gf_payload {
+            GrafanaPayload::Legacy(p) => ApprisePayload::from(p),
+            GrafanaPayload::Unified(p) => ApprisePayload::from(p),
+        }
+    }
+}
+
+impl From<LegacyPayload> for ApprisePayload {
+    fn from(gf_payload: LegacyPayload) -> ApprisePayload {
         ApprisePayload {
             title: gf_payload.title,
             body: gf_payload.message,
             notification_type: AppriseState::from(gf_payload.state),
+        }
+    }
+}
+
+impl From<UnifiedPayload> for ApprisePayload {
+    fn from(gf_payload: UnifiedPayload) -> ApprisePayload {
+        let notification_type = match gf_payload.status.as_str() {
+            "firing" => AppriseState::Failure,
+            "resolved" => AppriseState::Success,
+            _ => AppriseState::Info,
+        };
+
+        let mut body = gf_payload.message;
+
+        if !gf_payload.common_labels.is_empty() {
+            body.push_str("\n\nLabels:");
+            for (key, value) in &gf_payload.common_labels {
+                body.push_str(&format!("\n- {}: {}", key, value));
+            }
+        }
+
+        if !gf_payload.common_annotations.is_empty() {
+            body.push_str("\n\nAnnotations:");
+            for (key, value) in &gf_payload.common_annotations {
+                body.push_str(&format!("\n- {}: {}", key, value));
+            }
+        }
+
+        ApprisePayload {
+            title: gf_payload.title,
+            body,
+            notification_type,
         }
     }
 }
@@ -56,6 +97,7 @@ pub fn get_apprise_url() -> Option<Url> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
     use std::env::set_var;
     use url::Url;
 
@@ -78,5 +120,41 @@ mod tests {
                 .as_str(),
             "http://apprise:8080/notify/foo"
         );
+    }
+
+    #[test]
+    fn test_unified_payload_conversion() {
+        let mut common_labels = HashMap::new();
+        common_labels.insert("severity".to_string(), "critical".to_string());
+
+        let payload = UnifiedPayload {
+            title: "Test Alert".to_string(),
+            message: "Something is wrong".to_string(),
+            status: "firing".to_string(),
+            common_labels,
+            common_annotations: HashMap::new(),
+        };
+        let apprise_payload = ApprisePayload::from(payload);
+        assert_eq!(apprise_payload.title, "Test Alert");
+        assert!(apprise_payload.body.contains("Something is wrong"));
+        assert!(apprise_payload.body.contains("Labels:"));
+        assert!(apprise_payload.body.contains("- severity: critical"));
+        assert!(matches!(
+            apprise_payload.notification_type,
+            AppriseState::Failure
+        ));
+
+        let payload_resolved = UnifiedPayload {
+            title: "Test Alert".to_string(),
+            message: "Everything is fine".to_string(),
+            status: "resolved".to_string(),
+            common_labels: HashMap::new(),
+            common_annotations: HashMap::new(),
+        };
+        let apprise_payload_resolved = ApprisePayload::from(payload_resolved);
+        assert!(matches!(
+            apprise_payload_resolved.notification_type,
+            AppriseState::Success
+        ));
     }
 }
