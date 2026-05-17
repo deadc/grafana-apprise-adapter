@@ -16,3 +16,6 @@ log = "0.4"
 actix-rt = "2.9"
 awc = "3"
 serde_json = "1.0"
+
+[dev-dependencies]
+serde_urlencoded = "0.7"

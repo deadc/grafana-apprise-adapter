@@ -1,6 +1,7 @@
 use actix_web::middleware::Logger;
 use actix_web::{web, App, HttpServer};
 use env_logger::Env;
+use std::env;
 use std::process::exit;
 
 mod apprise;
@@ -21,7 +22,14 @@ async fn main() -> std::io::Result<()> {
         }
     };
 
-    let app_state = state::AppState { apprise_url };
+    let app_state = state::AppState {
+        apprise_url,
+        append_labels: env::var("APPEND_LABELS").unwrap_or_else(|_| "true".to_string()) == "true",
+        append_annotations: env::var("APPEND_ANNOTATIONS").unwrap_or_else(|_| "true".to_string())
+            == "true",
+        title_annotation: env::var("TITLE_ANNOTATION").ok(),
+        body_annotation: env::var("BODY_ANNOTATION").ok(),
+    };
 
     HttpServer::new(move || {
         App::new()

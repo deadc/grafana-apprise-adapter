@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum GrafanaState {
     Ok,
@@ -12,14 +12,14 @@ pub enum GrafanaState {
     NoData,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum GrafanaPayload {
     Legacy(LegacyPayload),
     Unified(UnifiedPayload),
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct LegacyPayload {
     pub title: String,
     pub message: String,
@@ -31,7 +31,7 @@ pub struct LegacyPayload {
     pub tags: HashMap<String, String>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct UnifiedPayload {
     pub title: String,
     pub message: String,
